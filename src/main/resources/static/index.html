@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>反例套索查验台</title>
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<header>
+  <h1>反例套索查验台</h1>
+  <p class="sub">模型检查器活性反例 · 前缀 + 循环重放、接受集覆盖、公平性切换与三类缩减（保留并列候选）</p>
+</header>
+
+<main>
+  <section class="panel" id="controlPanel">
+    <h2>查验控制</h2>
+    <div class="controls">
+      <label>循环入口
+        <select id="entrySelect"></select>
+      </label>
+      <label class="check"><input type="checkbox" id="fairnessToggle"> 启用公平性假设</label>
+      <button id="checkBtn" class="primary">重放查验</button>
+    </div>
+    <p id="entryLabel" class="entry-label"></p>
+    <div class="controls reduce-controls">
+      <button data-kind="STATE">缩减：最少状态</button>
+      <button data-kind="VARIABLE">缩减：最少变量</button>
+      <button data-kind="ITERATION">缩减：最少循环迭代</button>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>套索图（SVG）</h2>
+    <div id="lassoSvg" class="svg-box"></div>
+    <div class="legend">
+      <span><i class="dot prefix"></i>前缀状态</span>
+      <span><i class="dot loop"></i>循环状态</span>
+      <span><i class="dot entry"></i>循环入口</span>
+      <span><i class="dot accept"></i>接受集成员</span>
+      <span><i class="dot fair"></i>公平集成员</span>
+      <span><i class="line back"></i>回边见证</span>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>查验结论</h2>
+    <div id="verdictBox" class="verdict muted">尚未查验。</div>
+    <div id="coverageTables"></div>
+  </section>
+
+  <section class="panel">
+    <h2>状态序列与转移卫式</h2>
+    <div class="table-wrap">
+      <table id="stepsTable">
+        <thead><tr><th>#</th><th>源状态</th><th>目标</th><th>转移见证</th><th>卫式</th><th>判定</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>缩减候选</h2>
+    <p class="muted" id="reduceHint">同一最优分数下的全部并列候选都会保留；每个候选均在原模型上重放，并记录被删元素。文本解释长度是独立目标（标记“最短解释”）。</p>
+    <div id="candidates" class="candidates"></div>
+  </section>
+
+  <section class="panel">
+    <h2>状态变量取值</h2>
+    <div class="table-wrap">
+      <table id="valuesTable">
+        <thead></thead><tbody></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>运行记录（SQLite）</h2>
+    <div class="controls">
+      <button id="refreshRecords">刷新</button>
+      <button id="exportRecords">导出 JSON</button>
+      <button id="clearRecords" class="danger">清空数据库</button>
+    </div>
+    <div class="controls">
+      <input type="file" id="importFile" accept="application/json,.json">
+      <button id="importRecords">导入并复核</button>
+      <span id="importSummary" class="muted"></span>
+    </div>
+    <div class="table-wrap">
+      <table id="recordsTable">
+        <thead><tr><th>ID</th><th>时间</th><th>操作</th><th>入口</th><th>公平性</th><th>缩减</th><th>判定</th><th>重现违例</th><th>来源</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<footer>固定夹具 · 数据与判定均由后端在原模型上重放生成 · <code>counterexample-lasso-fixture-1</code></footer>
+<script src="app.js"></script>
+</body>
+</html>

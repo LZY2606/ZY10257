@@ -34,3 +34,6 @@ coverage/
 .vite/
 .turbo/
 *.tsbuildinfo
+
+# SQLite 运行数据库（可由导出文件重新导入）
+data/*.db

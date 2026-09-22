@@ -1,0 +1,247 @@
+{
+  "name": "counterexample-lasso-fixture-1",
+  "description": "固定夹具：活性属性 G F (pc=3) 的模型检查器反例，一条轨迹带两个合法循环入口；接受集 {L5} 与公平集 {L3} 用于区分循环上的无限次满足与前缀的有限次出现。",
+  "variables": [
+    {
+      "name": "pc",
+      "type": "INT",
+      "description": "程序位置"
+    },
+    {
+      "name": "req",
+      "type": "BOOL",
+      "description": "请求标志（多个前缀/循环转移卫式使用）"
+    },
+    {
+      "name": "tok",
+      "type": "BOOL",
+      "description": "令牌标志（仅前缀转移卫式使用）"
+    },
+    {
+      "name": "a",
+      "type": "BOOL",
+      "description": "并行条件 A（与 b 构成析取，最少变量缩减产生并列）"
+    },
+    {
+      "name": "b",
+      "type": "BOOL",
+      "description": "并行条件 B（与 a 构成析取，最少变量缩减产生并列）"
+    },
+    {
+      "name": "noise",
+      "type": "BOOL",
+      "description": "与所有卫式无关的噪声变量，缩减时应被删除"
+    }
+  ],
+  "states": [
+    {
+      "id": "L6",
+      "label": "L6 启动",
+      "values": {
+        "pc": 6,
+        "req": 0,
+        "tok": 1,
+        "a": 0,
+        "b": 1,
+        "noise": 1
+      }
+    },
+    {
+      "id": "L0",
+      "label": "L0 空闲",
+      "values": {
+        "pc": 0,
+        "req": 1,
+        "tok": 1,
+        "a": 0,
+        "b": 1,
+        "noise": 0
+      }
+    },
+    {
+      "id": "L1",
+      "label": "L1 等待",
+      "values": {
+        "pc": 1,
+        "req": 1,
+        "tok": 1,
+        "a": 0,
+        "b": 1,
+        "noise": 1
+      }
+    },
+    {
+      "id": "L3",
+      "label": "L3 取请求",
+      "values": {
+        "pc": 3,
+        "req": 0,
+        "tok": 0,
+        "a": 1,
+        "b": 1,
+        "noise": 0
+      }
+    },
+    {
+      "id": "L4",
+      "label": "L4 执行",
+      "values": {
+        "pc": 4,
+        "req": 1,
+        "tok": 0,
+        "a": 1,
+        "b": 0,
+        "noise": 1
+      }
+    },
+    {
+      "id": "L5",
+      "label": "L5 接受",
+      "values": {
+        "pc": 5,
+        "req": 0,
+        "tok": 0,
+        "a": 1,
+        "b": 1,
+        "noise": 0
+      }
+    },
+    {
+      "id": "L2",
+      "label": "L2 丢失请求",
+      "values": {
+        "pc": 2,
+        "req": 0,
+        "tok": 0,
+        "a": 0,
+        "b": 1,
+        "noise": 1
+      }
+    }
+  ],
+  "transitions": [
+    {
+      "id": "e60",
+      "source": "L6",
+      "target": "L0",
+      "guard": "!req",
+      "description": "启动到空闲"
+    },
+    {
+      "id": "e01",
+      "source": "L0",
+      "target": "L1",
+      "guard": "tok",
+      "description": "取得令牌后等待"
+    },
+    {
+      "id": "e13",
+      "source": "L1",
+      "target": "L3",
+      "guard": "req",
+      "description": "请求到达并被处理"
+    },
+    {
+      "id": "e34",
+      "source": "L3",
+      "target": "L4",
+      "guard": "a || b",
+      "description": "并行条件之一满足即可执行"
+    },
+    {
+      "id": "e45",
+      "source": "L4",
+      "target": "L5",
+      "guard": "req",
+      "description": "执行到达接受位置"
+    },
+    {
+      "id": "e53",
+      "source": "L5",
+      "target": "L3",
+      "guard": "!req",
+      "description": "返回处理循环（入口 A 的回边）"
+    },
+    {
+      "id": "e52",
+      "source": "L5",
+      "target": "L2",
+      "guard": "!req",
+      "description": "请求丢失分支"
+    },
+    {
+      "id": "e24",
+      "source": "L2",
+      "target": "L4",
+      "guard": "!req",
+      "description": "跳过取请求直接执行"
+    },
+    {
+      "id": "e61",
+      "source": "L6",
+      "target": "L1",
+      "guard": "!req && tok",
+      "description": "启动跨跳：删除 L0 的见证"
+    },
+    {
+      "id": "e03",
+      "source": "L0",
+      "target": "L3",
+      "guard": "tok && req",
+      "description": "空闲跨跳：删除 L1 的见证"
+    }
+  ],
+  "acceptanceSets": [
+    {
+      "id": "ACC",
+      "name": "接受集 Acc = {L5}",
+      "kind": "ACCEPTANCE",
+      "memberStateIds": [
+        "L5"
+      ]
+    }
+  ],
+  "fairnessSets": [
+    {
+      "id": "FAIR",
+      "name": "公平集 Fair = {L3}",
+      "kind": "FAIRNESS",
+      "memberStateIds": [
+        "L3"
+      ]
+    }
+  ],
+  "trace": [
+    "L6",
+    "L0",
+    "L1",
+    "L3",
+    "L4",
+    "L5",
+    "L2",
+    "L4",
+    "L5",
+    "L3",
+    "L4",
+    "L5",
+    "L3",
+    "L4",
+    "L5"
+  ],
+  "loopEntries": [
+    {
+      "index": 9,
+      "loopPeriod": 3,
+      "stateId": "L3",
+      "label": "入口 A：处理循环 L3→L4→L5（其后记录了两轮）",
+      "backEdgeTransitionId": "e53"
+    },
+    {
+      "index": 6,
+      "loopPeriod": 3,
+      "stateId": "L2",
+      "label": "入口 B：丢请求循环 L2→L4→L5（L3 只在其前缀出现；回边 e52 由模型提供见证）",
+      "backEdgeTransitionId": "e52"
+    }
+  ]
+}

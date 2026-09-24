@@ -1,0 +1,370 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>反例套索查验台</title>
+<style>
+  :root { --ink:#1f2937; --muted:#6b7280; --line:#d1d5db; --bg:#f8fafc;
+          --ok:#15803d; --bad:#b91c1c; --warn:#b45309; --accent:#3730a3; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+         color:var(--ink); background:var(--bg); }
+  header { background:#1e293b; color:#f8fafc; padding:16px 24px; }
+  header h1 { margin:0; font-size:20px; }
+  header p { margin:4px 0 0; color:#cbd5e1; font-size:13px; }
+  main { max-width:1180px; margin:0 auto; padding:20px; }
+  .panel { background:#fff; border:1px solid var(--line); border-radius:10px;
+           padding:16px 18px; margin-bottom:18px; }
+  .panel h2 { margin:0 0 12px; font-size:16px; }
+  .row { display:flex; flex-wrap:wrap; gap:12px; align-items:center; }
+  label { font-size:13px; color:#374151; }
+  select, button, textarea { font:inherit; }
+  select { padding:6px 8px; border:1px solid var(--line); border-radius:6px; background:#fff; }
+  button { padding:7px 14px; border-radius:6px; border:1px solid var(--accent);
+           background:var(--accent); color:#fff; cursor:pointer; font-size:13px; }
+  button.secondary { background:#fff; color:var(--accent); }
+  button.danger { border-color:var(--bad); background:var(--bad); }
+  button:disabled { opacity:.5; cursor:not-allowed; }
+  .switch { display:inline-flex; gap:6px; align-items:center; }
+  #diagram { overflow-x:auto; border:1px dashed var(--line); border-radius:8px; padding:10px; background:#fcfcfd; }
+  .verdict { border-left:5px solid var(--muted); padding:10px 14px; border-radius:6px;
+             background:#f1f5f9; font-size:14px; margin-top:12px; white-space:pre-wrap; }
+  .verdict.ok { border-color:var(--ok); background:#f0fdf4; }
+  .verdict.bad { border-color:var(--bad); background:#fef2f2; }
+  .chips { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .chip { font-size:12px; padding:3px 9px; border-radius:999px; border:1px solid var(--line);
+          background:#f8fafc; font-family:monospace; }
+  .chip.accept { border-color:#86efac; background:#f0fdf4; color:var(--ok); }
+  .chip.fair { border-color:#c4b5fd; background:#f5f3ff; color:#6d28d9; }
+  .chip.missing { border-color:#fca5a5; background:#fef2f2; color:var(--bad); }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { border-bottom:1px solid var(--line); padding:6px 8px; text-align:left; vertical-align:top; }
+  th { color:var(--muted); font-weight:600; }
+  code, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size:12px; }
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .candidate { border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin:10px 0; }
+  .candidate h3 { margin:0 0 6px; font-size:13px; color:var(--accent); }
+  .muted { color:var(--muted); font-size:12px; }
+  textarea { width:100%; min-height:120px; border:1px solid var(--line); border-radius:6px; padding:8px; }
+  .toast { position:fixed; right:20px; bottom:20px; background:#111827; color:#fff;
+           padding:10px 16px; border-radius:8px; font-size:13px; opacity:0; transition:opacity .3s; }
+  .toast.show { opacity:.95; }
+  @media (max-width:860px) { .grid2 { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>反例套索查验台</h1>
+  <p>活性性质 Büchi 反例：前缀 + 循环。验证接受集覆盖、循环公平性与返回入口的真实转移见证。</p>
+</header>
+<main>
+  <section class="panel">
+    <h2>1. 选择反例与循环入口</h2>
+    <div class="row">
+      <label>反例
+        <select id="ceSelect"></select>
+      </label>
+      <label>循环入口
+        <select id="entrySelect"></select>
+      </label>
+      <span class="switch">
+        <input type="checkbox" id="fairnessToggle"/>
+        <label for="fairnessToggle">启用公平性假设（仅在循环上评估）</label>
+      </span>
+      <button id="verifyBtn">查验反例</button>
+      <span id="ceDesc" class="muted"></span>
+    </div>
+    <div id="verdict" class="verdict">尚未查验。选择入口后点击“查验反例”。</div>
+  </section>
+
+  <section class="panel">
+    <h2>2. 状态序列、转移卫式与接受集覆盖</h2>
+    <div id="coverage" class="chips"></div>
+    <div id="diagram"></div>
+    <div class="grid2" style="margin-top:12px">
+      <div>
+        <h3 class="muted">状态序列（变量赋值）</h3>
+        <table id="stateTable"><thead>
+          <tr><th>#</th><th>状态</th><th>变量</th><th>接受/公平</th></tr>
+        </thead><tbody></tbody></table>
+      </div>
+      <div>
+        <h3 class="muted">重放见证（环末必须有返回入口的合法转移）</h3>
+        <table id="witnessTable"><thead>
+          <tr><th>步</th><th>转移见证</th></tr>
+        </thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>3. 不改变语义的缩减（每个候选都对原模型重放）</h2>
+    <div class="row">
+      <button class="secondary" data-kind="state">状态缩减（最少状态）</button>
+      <button class="secondary" data-kind="variables">变量缩减（最少变量）</button>
+      <button class="secondary" data-kind="iterations">循环迭代缩减（最少迭代）</button>
+      <span class="muted">最优分数相同的候选全部并列保留；最短文本解释仅作展示，不参与淘汰。</span>
+    </div>
+    <div id="reductionMeta" class="muted" style="margin-top:8px"></div>
+    <div id="reductionCandidates"></div>
+  </section>
+
+  <section class="panel">
+    <h2>4. 运行记录与数据复核</h2>
+    <div class="row">
+      <button class="secondary" id="refreshRuns">刷新运行记录</button>
+      <button class="secondary" id="exportBtn">导出全部（JSON）</button>
+      <button class="secondary" id="copyExport">复制导出 JSON</button>
+      <button class="danger" id="wipeImportBtn">清空数据库并重新导入</button>
+      <button class="secondary" id="resetBtn">恢复固定 fixture</button>
+    </div>
+    <div style="margin-top:10px">
+      <label>导入 JSON（粘贴此前导出的快照后点击“清空数据库并重新导入”）</label>
+      <textarea id="importBox" placeholder='{"format":"lasso-checker-export/v1", ...}'></textarea>
+    </div>
+    <h3 class="muted" style="margin-top:12px">运行记录</h3>
+    <table id="runTable"><thead>
+      <tr><th>时间 (UTC)</th><th>动作</th><th>详情</th></tr>
+    </thead><tbody></tbody></table>
+  </section>
+</main>
+<div id="toast" class="toast"></div>
+<script>
+'use strict';
+const state = { overview:null, currentCe:null, currentModel:null, verify:null, currentReduction:null };
+
+const $ = (id) => document.getElementById(id);
+async function api(path, options = {}) {
+  const res = await fetch(path, {
+    headers: options.body ? {'Content-Type':'application/json'} : {},
+    ...options
+  });
+  const text = await res.text();
+  const data = text ? JSON.parse(text) : {};
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
+  return data;
+}
+function toast(msg) {
+  const el = $('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2400);
+}
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+function ce() {
+  return state.overview.counterexamples.find(c => c.id === $('ceSelect').value);
+}
+function modelOf(c) {
+  return state.overview.models.find(m => m.id === c.modelId);
+}
+function stateOf(model, id) {
+  return model.states.find(s => s.stateId === id);
+}
+
+async function loadOverview(keepSelection) {
+  state.overview = await api('/api/overview');
+  const ceSelect = $('ceSelect');
+  const prevCe = keepSelection ? ceSelect.value : null;
+  ceSelect.innerHTML = state.overview.counterexamples
+    .map(c => `<option value="${esc(c.id)}">${esc(c.id)} — ${esc(c.name)}</option>`).join('');
+  if (prevCe && state.overview.counterexamples.some(c => c.id === prevCe)) ceSelect.value = prevCe;
+  onCeChanged();
+}
+
+function onCeChanged() {
+  const counter = ce();
+  state.currentCe = counter;
+  state.currentModel = modelOf(counter);
+  $('ceDesc').textContent = counter.description || '';
+  $('entrySelect').innerHTML = counter.entries.map(e =>
+    `<option value="${esc(e.stateId)}">${esc(e.stateId)}${e.legal ? '' : '（非法入口）'} — ${esc(e.note||'')}</option>`
+  ).join('');
+  clearResults();
+}
+
+function clearResults() {
+  state.verify = null;
+  state.currentReduction = null;
+  $('verdict').className = 'verdict';
+  $('verdict').textContent = '尚未查验。选择入口后点击“查验反例”。';
+  $('coverage').innerHTML = '';
+  $('diagram').innerHTML = '';
+  $('stateTable').querySelector('tbody').innerHTML = '';
+  $('witnessTable').querySelector('tbody').innerHTML = '';
+  $('reductionMeta').textContent = '';
+  $('reductionCandidates').innerHTML = '';
+}
+
+function requestBody(extra) {
+  return JSON.stringify({
+    ceId: $('ceSelect').value,
+    entry: $('entrySelect').value,
+    fairness: $('fairnessToggle').checked,
+    ...extra
+  });
+}
+
+async function doVerify() {
+  const result = await api('/api/verify', { method:'POST', body: requestBody({}) });
+  state.verify = result;
+  renderVerify(result);
+  await loadRuns();
+}
+
+function chip(cls, text) { return `<span class="chip ${cls}">${esc(text)}</span>`; }
+
+function renderVerify(result) {
+  const v = $('verdict');
+  v.className = 'verdict ' + (result.violationReproduced ? 'ok' : 'bad');
+  v.textContent = (result.violationReproduced ? '✔ 违例复现。' : '✘ 未复现违例。') + '\n' + result.verdict;
+
+  const coverage = [];
+  result.acceptUniverse.forEach(a => {
+    coverage.push(chip(result.acceptCovered.includes(a) ? 'accept' : 'missing',
+      '接受 ' + a + (result.acceptCovered.includes(a) ? '（循环覆盖）' : '（循环缺失）')));
+  });
+  result.fairUniverse.forEach(f => {
+    if (!$('fairnessToggle').checked) {
+      coverage.push(chip('', '公平 ' + f + '（假设关闭，不评估）'));
+    } else {
+      coverage.push(chip(result.fairSatisfied.includes(f) ? 'fair' : 'missing',
+        '公平 ' + f + (result.fairSatisfied.includes(f) ? '（循环无限满足）' : '（循环缺失；前缀出现不算）')));
+    }
+  });
+  $('coverage').innerHTML = coverage.join('');
+
+  const trace = state.currentCe.trace;
+  $('stateTable').querySelector('tbody').innerHTML = trace.map((id, i) => {
+    const s = stateOf(state.currentModel, id);
+    const tags = [
+      ...s.acceptSets.map(a => '◇' + a),
+      ...s.fairSets.map(f => '♢' + f)
+    ].join(' ');
+    const vars = Object.entries(s.variables).map(([k,val]) => `${k}=${val}`).join(', ');
+    const isEntry = id === $('entrySelect').value;
+    return `<tr${isEntry ? ' style="background:#fffbeb"' : ''}><td>${i}</td><td class="mono">${esc(id)}${isEntry?' ⮌':''}</td><td class="mono">${esc(vars)}</td><td class="mono">${esc(tags)}</td></tr>`;
+  }).join('');
+
+  const witnesses = result.replay.witnesses;
+  const missing = result.replay.missingEdges;
+  $('witnessTable').querySelector('tbody').innerHTML =
+    witnesses.map((w,i) => `<tr><td>${i+1}</td><td class="mono">${esc(w)}</td></tr>`).join('') +
+    missing.map((m,i) => `<tr><td>!</td><td class="mono" style="color:var(--bad)">缺失: ${esc(m)}</td></tr>`).join('');
+
+  redrawDiagram([], []);
+}
+
+async function redrawDiagram(deletedStates, keptVariables) {
+  const diagram = await api('/api/diagram', { method:'POST', body: requestBody({
+    deletedStates, keptVariables
+  })});
+  $('diagram').innerHTML = diagram.svg;
+}
+
+async function doReduce(kind) {
+  const report = await api('/api/reduce', { method:'POST', body: requestBody({ kind }) });
+  state.currentReduction = report;
+  renderReduction(report);
+  await loadRuns();
+}
+
+function renderReduction(report) {
+  const meta = `类型：${report.kind} ｜ 最优指标（${esc(report.metricLabel)}）：${report.bestMetric}`
+    + (report.tie ? ' ｜ 存在并列候选，已全部保留' : ' ｜ 唯一最优候选');
+  $('reductionMeta').textContent = meta;
+  $('reductionCandidates').innerHTML = report.candidates.map((c, idx) => {
+    const replay = c.replay;
+    const varsKept = c.keptVariables.length ? c.keptVariables.join(', ') : '（不涉及变量缩减）';
+    const varsDel = c.deletedVariables.length ? c.deletedVariables.join(', ') : '（无）';
+    const statesDel = c.deletedStates.length ? c.deletedStates.join(', ') : '（无）';
+    return `<div class="candidate">
+      <h3>候选 ${idx+1} <span class="mono">${esc(c.key)}</span></h3>
+      <div>${esc(c.explanation)}</div>
+      <div class="grid2" style="margin-top:6px">
+        <table>
+          <tr><th>保留状态</th><td class="mono">${esc(c.keptStates.join(' → '))}</td></tr>
+          <tr><th>删除状态</th><td class="mono">${esc(statesDel)}</td></tr>
+          <tr><th>循环迭代数</th><td class="mono">${c.loopIterations}</td></tr>
+        </table>
+        <table>
+          <tr><th>保留变量</th><td class="mono">${esc(varsKept)}</td></tr>
+          <tr><th>删除变量</th><td class="mono">${esc(varsDel)}</td></tr>
+          <tr><th>重放结论</th><td style="color:${replay.violationReproduced?'var(--ok)':'var(--bad)'}">
+            ${replay.violationReproduced?'✔ 违例仍然复现':'✘ '+esc(replay.verdict)}</td></tr>
+        </table>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <button class="secondary" data-show-idx="${idx}">在图上查看该候选</button>
+      </div>
+    </div>`;
+  }).join('');
+  document.querySelectorAll('[data-show-idx]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const c = report.candidates[Number(btn.dataset.showIdx)];
+      redrawDiagram(c.deletedStates, c.keptVariables);
+      window.scrollTo({ top:$('diagram').getBoundingClientRect().top + window.scrollY - 80, behavior:'smooth' });
+    });
+  });
+}
+
+async function loadRuns() {
+  const data = await api('/api/runs?limit=100');
+  $('runTable').querySelector('tbody').innerHTML = data.logs.map(l =>
+    `<tr><td class="mono">${esc(l.created_at)}</td><td>${esc(l.action)}</td><td class="mono">${esc(l.detail||'')}</td></tr>`
+  ).join('');
+}
+
+async function doExport() {
+  const data = await api('/api/export', { method:'POST' });
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'lasso-export.json'; a.click();
+  URL.revokeObjectURL(url);
+  toast('已导出运行记录快照');
+  await loadRuns();
+}
+
+async function doCopyExport() {
+  const data = await api('/api/export', { method:'POST' });
+  await navigator.clipboard.writeText(JSON.stringify(data, null, 2));
+  toast('导出 JSON 已复制到剪贴板');
+}
+
+async function doWipeImport() {
+  const body = $('importBox').value.trim();
+  if (!body) { alert('请先粘贴导出的 JSON 快照；若只想恢复内置夹具请点“恢复固定 fixture”。'); return; }
+  if (!confirm('将清空当前 SQLite 全部数据并导入该快照，继续？')) return;
+  const result = await api('/api/import', { method:'POST', body });
+  await loadOverview();
+  await loadRuns();
+  toast(`导入完成：${result.imported.models} 个模型，${result.imported.counterexamples} 个反例`);
+}
+
+async function doReset() {
+  if (!confirm('清空全部数据并恢复内置固定 fixture？')) return;
+  await api('/api/reset', { method:'POST' });
+  await loadOverview();
+  await loadRuns();
+  toast('已恢复固定 fixture');
+}
+
+$('ceSelect').addEventListener('change', onCeChanged);
+$('entrySelect').addEventListener('change', clearResults);
+$('fairnessToggle').addEventListener('change', () => { if (state.verify) doVerify(); });
+$('verifyBtn').addEventListener('click', () => doVerify().catch(e => toast(e.message)));
+document.querySelectorAll('[data-kind]').forEach(btn =>
+  btn.addEventListener('click', () => doReduce(btn.dataset.kind).catch(e => toast(e.message))));
+$('refreshRuns').addEventListener('click', () => loadRuns().catch(e => toast(e.message)));
+$('exportBtn').addEventListener('click', () => doExport().catch(e => toast(e.message)));
+$('copyExport').addEventListener('click', () => doCopyExport().catch(e => toast(e.message)));
+$('wipeImportBtn').addEventListener('click', () => doWipeImport().catch(e => toast(e.message)));
+$('resetBtn').addEventListener('click', () => doReset().catch(e => toast(e.message)));
+
+loadOverview().then(loadRuns).catch(e => toast(e.message));
+</script>
+</body>
+</html>
